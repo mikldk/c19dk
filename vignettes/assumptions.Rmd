@@ -1,0 +1,298 @@
+---
+title: "Sensitivitetsanalyse"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{assumptions}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  echo = FALSE
+)
+```
+
+Sensitivitetsanalyse af "C19REST 0.3.0" (<https://kagr.shinyapps.io/C19DK/>). Baseret på Grundscenariet og med `nrep = 10` (så altså kun for at illustrere koden).
+
+```{r setup}
+library(c19dk)
+```
+
+```{r, include = FALSE}
+have_packages <- requireNamespace("ggplot2", quietly = TRUE) &&
+  requireNamespace("dplyr", quietly = TRUE) && 
+  requireNamespace("tidyr", quietly = TRUE) && 
+  requireNamespace("Hmisc", quietly = TRUE)
+
+if (!have_packages) {
+  knitr::opts_chunk$set(eval = FALSE)
+}
+```
+
+```{r, message=FALSE}
+library(ggplot2)
+theme_set(theme_bw())
+
+library(dplyr)
+library(tidyr)
+
+library(Hmisc)
+```
+
+```{r, echo = TRUE}
+input <- list(
+  # beta til 14 Apr - uden åbning
+  r.betaWIlt = c(.12, .22), # Smitterate indenfor <60 aldersgruppe
+  r.betaWIge = c(.14, .24), # Smitterate indenfor >=60 aldersgruppe
+  r.betaB = c(.02, .12), # Smitterate mellem aldersgrupper
+  
+  # beta fra 14 Apr (her: grundscenarie)
+  r.betaWIlt1 = c(.16, .26), # Smitterate indenfor <60 aldersgruppe
+  r.betaWIge1 = c(.13, .23), # Smitterate indenfor >=60 aldersgruppe
+  r.betaB1 = c(.03, .13), # Smitterate mellem aldersgrupper
+  
+  r.ER = c(50, 150), # MC: Skalering ("efficiency of restrictions")
+  
+  # Antal dage på ICU før bortgang
+  r.mu31 = c(14, 28),   # Under 60 
+  r.mu32 = c(14, 28),   # Over 60
+  
+  # Antal dage før rask udenfor hospital
+  r.recI11 = c(4, 6),   # Under 60
+  r.recI12 = c(4, 6),   # Over 60
+  
+  # Antal dage på hospital før udskrivelse
+  r.recI21 = c(5, 9),   # Under 60
+  r.recI22 = c(5, 15),  # Over 60
+  
+  # Antal dage på ICU før udskrivelse
+  r.recI31 = c(14, 28), # Under 60
+  r.recI32 = c(14, 28), # Over 60
+  
+  # Latenstid
+  r.kE1 = c(4, 6), # Under 60
+  r.kE2 = c(4, 6), # Over 60
+  
+  # Antal dage efter symptomer før indlæggelse
+  r.k1 = c(6, 10), # Under 60
+  r.k2 = c(5, 9), # Over 60
+  
+  # Antal dage til ICU efter indlæggelse
+  r.gI231 = c(0.5, 2.5), # Under 60
+  r.gI232 = c(0.5, 1.5), # Over 60
+    
+  # Andel [%] med sygdom der indlægges
+  r.pI1R1 = c(0.05, 0.5), # Under 60
+  r.pI1R2 = c(5, 6.2),    # Over 60
+  
+  # Sandsynlighed for rask efter indlæggelse
+  r.pI2R1 = c(0.77, 0.97), # Under 60
+  r.pI2R2 = c(0.7, 0.9),   # Over 60
+  
+  # Sandsynlighed for at overleve ICU
+  r.pI3R1 = c(0.7, 0.95),  # Under 60
+  r.pI3R2 = c(0.45, 0.55), # Over 60
+    
+  ## Antal smittede 11 marts
+  r.InfInit1 = c(40000, 70000), # Under 60
+  r.InfInit2 = c(5000, 14000)  # Over 60
+)
+```
+
+```{r}
+pop <- c(4.3e6, 1.8e6) # c(Under 60, Over 60)
+
+IndlagteHos <- c(10,NA,23,NA,28,62,82,129,153,183,206,232,254,301,350,386,430,459,499,533,529,535,525,517,507,504,503,472,453, 433,401, 408, 396, 388)  # 13/4
+IndlagteInt <- c(0,0,4,NA,2,10,18,24,30,37,42,46,55,69,87,94,109,121,131,139,145,146,153,143,142,144,139,127,127, 120, 113,  106, 104, 100)
+IndlagteHos <- IndlagteHos - IndlagteInt
+
+
+data_indlagte <- tibble(
+  Dato = as.Date("2020-03-11") + (seq_along(IndlagteHos) - 1), 
+  Hospital = IndlagteHos,
+  Intensiv = IndlagteInt
+) %>% 
+  mutate(inc_deviation = ifelse(row_number() <= 5, FALSE, TRUE)) 
+#print(data_indlagte, n = Inf)
+
+reference_date <- as.Date("2020-01-01")
+end_prediction_date <- as.Date("2020-09-01")
+contact_reduction_first_day <- as.Date("2020-04-14")
+
+############################
+first_date <- data_indlagte %>% 
+  slice(1) %>% 
+  pull(Dato) 
+
+set.seed(1234)
+samples_unif <- mc_sample(nrep = 10, input = input, 
+                          pop = pop, 
+                          reference_date = reference_date,
+                          first_date = first_date,
+                          end_prediction_date = end_prediction_date,
+                          contact_reduction_first_day = contact_reduction_first_day, 
+                          rnd_func = crunif)
+set.seed(1234)
+samples_norm <- mc_sample(nrep = 10, input = input, 
+                          pop = pop, 
+                          reference_date = reference_date,
+                          first_date = first_date,
+                          end_prediction_date = end_prediction_date,
+                          contact_reduction_first_day = contact_reduction_first_day, 
+                          rnd_func = crnorm)
+```
+
+```{r}
+data_indlagte %>% 
+  mutate(`Medtag i residualer` = ifelse(inc_deviation, "X", "")) %>% 
+  select(-inc_deviation) %>% 
+  knitr::kable()
+```
+
+
+```{r, include = FALSE}
+if (FALSE) {
+  d_weights_raw <- weights_mse(samples = samples_unif, 
+                               data_indlagte = data_indlagte, 
+                               min_weight = 0.1)
+  d_weights_raw
+  weight_cut_off <- d_weights_raw %>% pull(weight) %>% quantile(0)
+  weight_cut_off
+  
+  d_weights <- d_weights_raw %>% 
+    mutate(new_weight = ifelse(weight < weight_cut_off, 0, weight)) %>% 
+    select(MC, new_weight)
+  
+  d_weights %>% summarise(mean(new_weight == 0))
+  
+  d_curves <- d_weights %>% full_join(samples_unif$sim_indlagt_int, by = "MC")
+  
+  d_curves_qs <- d_curves %>% 
+    group_by(Dato) %>% 
+    summarise(qs = list(Hmisc::wtd.quantile(Antal, 
+                                       probs = c(0.1, 0.5, 0.8), 
+                                       weights = new_weight))) %>% 
+    rowwise() %>% 
+    mutate(qs_val = list(names(qs))) %>% 
+    unnest(c(qs_val, qs))
+  d_curves_qs
+  
+  ggplot(d_curves_qs, aes(Dato, qs, color = qs_val)) + 
+    geom_line() 
+
+}
+```
+
+
+* MSE = $\sum_i \left (y_i - \hat{y}_i \right )^2$
+* MSRE = $\sum_i \left (\log(y_i) - \log(\hat{y}_i) \right )^2$
+
+* Uniform: Ligefordelte parametre
+* Normal: Intervallerne angiver de centrale 95% i en normalfordeling, hvor parametrene trækkes fra (*rejection sampling* sikrer at de er positive)
+
+
+
+```{r}
+conditions <- list(
+  list(name = "Uniform", samples = samples_unif),
+  list(name = "Normal", samples = samples_norm)
+)
+
+#min_weights <- c(0.01, 0.1)
+min_weights <- c(0.1)
+discard_props <- c(0.5, 0.6, 0.7)
+
+d_weights_raw <- lapply(min_weights, function(min_weight) {
+  lapply(seq_along(conditions), function(i_conditions) {
+    
+    samples <- conditions[[i_conditions]]$samples
+    
+    d_weights_mse <- weights_mse(samples = samples, data_indlagte = data_indlagte, min_weight = min_weight)
+  d_weights_msre <- weights_msre(samples = samples, data_indlagte = data_indlagte, min_weight = min_weight)
+
+    d_tmp <- bind_rows(
+      d_weights_mse %>% select(MC, weight) %>% mutate(Error = "MSE"),
+      d_weights_msre %>% select(MC, weight) %>% mutate(Error = "MSRE")
+      ) %>% 
+      group_by(Error) %>% 
+      mutate(rank = rank(weight)) %>% 
+      mutate(RandomType = conditions[[i_conditions]]$name,
+             min_weight = min_weight)
+    
+    d_tmp
+  }) %>% bind_rows()
+}) %>% bind_rows()
+
+d_weights_thres <- d_weights_raw %>% 
+  group_by(Error, RandomType, min_weight) %>% 
+  summarise(weight_cut_off = list(quantile(weight, discard_props))) %>% 
+  rowwise() %>% 
+  mutate(discard_prop = list(discard_props)) %>% 
+  unnest(c(weight_cut_off, discard_prop))
+
+d_weights <- d_weights_raw %>% 
+  left_join(d_weights_thres, by = c("Error", "RandomType", "min_weight")) %>% 
+  mutate(new_weight = ifelse(weight < weight_cut_off, 0, weight)) %>% 
+  select(MC, Error, RandomType, min_weight, discard_prop, new_weight)
+
+#d_weights
+```
+
+```{r}
+d_curves_raw <- lapply(seq_along(conditions), function(i_conditions) {
+    samples <- conditions[[i_conditions]]$samples
+    samples$sim_indlagt_int %>% 
+      mutate(RandomType = conditions[[i_conditions]]$name)
+}) %>% bind_rows()
+```
+
+```{r}
+d_curves <- d_weights %>% 
+  full_join(d_curves_raw, by = c("MC", "RandomType"))
+
+#d_curves
+```
+
+```{r}
+d_curves_qs <- d_curves %>% 
+  group_by(Error, RandomType, min_weight, discard_prop, Dato) %>% 
+  summarise(qs = list(Hmisc::wtd.quantile(Antal, 
+                                     probs = c(0.1, 0.5, 0.8, 0.9), 
+                                     weights = new_weight))) %>% 
+  rowwise() %>% 
+  mutate(qs_val = list(names(qs))) %>% 
+  unnest(c(qs_val, qs))
+
+```
+
+
+```{r}
+stopifnot(1L == d_curves_qs %>% pull(min_weight) %>% unique() %>% length())
+d_curves_qs_plot <- d_curves_qs %>% 
+  mutate(Type1 = paste0("Discard fraction = ", discard_prop),
+         Type2 = paste0("Residuals = ", Error, " / Random = ", RandomType))
+```
+
+## Intensivpladser
+
+```{r, fig.width = 8, fig.height = 8}
+ggplot(d_curves_qs_plot, aes(Dato, qs, linetype = Type1, color = Type2)) + 
+  geom_line() + 
+  facet_wrap(~ qs_val, ncol = 1) +
+  labs(color = NULL, linetype = NULL)
+```
+
+90%:
+
+```{r, fig.width = 8, fig.height = 6}
+d_curves_qs_plot %>% 
+  filter(qs_val == "90%") %>% 
+  ggplot(aes(Dato, qs, color = Type2)) + 
+  geom_line() + 
+  facet_wrap(~ Type1, ncol = 1) +
+  labs(color = NULL)
+```
+

@@ -1,0 +1,29 @@
+Package: c19dk
+Type: Package
+Title: Simulation of Risk of ICU Overcrowding Due to COVID-19
+Version: 0.0.1
+Authors@R: c(
+    person(given = "Mikkel Meyer", family = "Andersen", 
+        email = "mikl@math.aau.dk", role = c("aut", "cre")),
+    person(given = "Kaare", family = "Græsbøll", 
+        role = c("cph"), comment = "Original developer of C19REST 0.3.0 (<https://kagr.shinyapps.io/C19DK/>)")
+  )
+Maintainer: Mikkel Meyer Andersen <mikl@math.aau.dk>
+Description: Based on "C19REST 0.3.0" <https://kagr.shinyapps.io/C19DK/> accessed at May 11, 2020.
+License: GPL (>= 2)
+Depends:
+    R (>= 3.6.0)
+Imports:
+    deSolve (>= 1.28),
+    epiR (>= 1.0-14)
+Suggests:
+    Hmisc,
+    ggplot2,
+    dplyr,
+    tidyr,
+    knitr,
+    rmarkdown
+Roxygen: list(markdown = TRUE)
+Encoding: UTF-8
+RoxygenNote: 7.1.0
+VignetteBuilder: knitr
