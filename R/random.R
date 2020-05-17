@@ -1,4 +1,6 @@
 #' Function to easier call runif
+#' 
+#' @export
 crunif <- function(invec) {
   
   if (length(invec) != 2L) {
@@ -9,6 +11,8 @@ crunif <- function(invec) {
 }
 
 #' Function to easier call rnorm
+#' 
+#' @export
 crnorm <- function(invec) {
   
   if (length(invec) != 2L) {
