@@ -5,6 +5,8 @@ Version: 0.0.1
 Authors@R: c(
     person(given = "Mikkel Meyer", family = "Andersen", 
         email = "mikl@math.aau.dk", role = c("aut", "cre")),
+    person(given = "Torben", family = "Tvedebrink",
+        email = "tvede@math.aau.dk", role = c("aut")),
     person(given = "Kaare", family = "Græsbøll", 
         role = c("cph"), comment = "Original developer of C19REST 0.3.0 (<https://kagr.shinyapps.io/C19DK/>)")
   )
